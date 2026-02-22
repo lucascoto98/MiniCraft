@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MiniCraft</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; background:#111; color:#fff; }
+    .screen { display:none; height:100vh; justify-content:center; align-items:center; flex-direction:column; }
+    .active { display:flex; }
+    button { padding:15px 25px; margin:10px; font-size:18px; border:none; border-radius:10px; background:#4CAF50; color:white; }
+    canvas { display:none; }
+
+    #topBar{
+      position:fixed;
+      top:10px;
+      left:10px;
+      z-index:5;
+    }
+
+    #inventory{
+      position:fixed;
+      bottom:0;
+      left:0;
+      width:100%;
+      height:60px;
+      background:#222;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      gap:10px;
+    }
+
+    .slot{
+      width:40px;
+      height:40px;
+      background:#555;
+      border:2px solid #999;
+    }
+
+    /* controlos mobile */
+    #mobileControls{
+      position:fixed;
+      bottom:80px;
+      left:10px;
+      display:none;
+      flex-direction:column;
+      gap:5px;
+    }
+
+    .ctrlRow{ display:flex; gap:5px; }
+
+    .ctrlBtn{
+      width:50px;
+      height:50px;
+      background:#333;
+      color:white;
+      font-size:20px;
+      border-radius:8px;
+      border:none;
+    }
+  </style>
+</head>
+<body>
+
+<!-- MENU PRINCIPAL -->
+<div id="menu" class="screen active">
+  <h1>MiniCraft</h1>
+  <button onclick="startGame()">Entrar</button>
+  <button onclick="openWorlds()">Mundos</button>
+  <button onclick="openSettings()">Definições</button>
+  <button onclick="openSchool()">Escola</button>
+  <button onclick="startMultiplayer()">Multiplayer</button>
+</div>
+
+<!-- MUNDOS -->
+<div id="worlds" class="screen">
+  <h2>Mundos</h2>
+  <button onclick="createNewWorld()">Novo Mundo</button>
+  <button onclick="startGame()">Mundo 1</button>
+  <button onclick="goMenu()">⬅ Voltar</button>
+</div>
+
+<!-- DEFINIÇÕES -->
+<div id="settings" class="screen">
+  <h2>Definições</h2>
+  <label>Som: <input type="range" id="volume" min="0" max="100" value="50" /></label>
+  <br>
+  <label>Mostrar controlos mobile <input type="checkbox" id="mobileToggle"></label>
+  <br>
+  <button onclick="goMenu()">⬅ Voltar</button>
+</div>
+
+<!-- ESCOLA -->
+<div id="school" class="screen">
+  <h2>Escola</h2>
+  <p>WASD = Jogador 1</p>
+  <p>Setas = Jogador 2</p>
+  <p>Clicar = colocar bloco</p>
+  <button onclick="goMenu()">⬅ Voltar</button>
+</div>
+
+<!-- BARRA SUPERIOR -->
+<div id="topBar" style="display:none;">
+  <button onclick="pauseGame()">⚙</button>
+</div>
+
+<!-- INVENTARIO -->
+<div id="inventory" style="display:none;">
+  <div class="slot"></div>
+  <div class="slot"></div>
+  <div class="slot"></div>
+  <div class="slot"></div>
+  <div class="slot"></div>
+</div>
+
+<!-- CONTROLOS MOBILE -->
+<div id="mobileControls">
+  <div class="ctrlRow">
+    <button class="ctrlBtn" onmousedown="pressKey('w')" onmouseup="releaseKey('w')">▲</button>
+  </div>
+  <div class="ctrlRow">
+    <button class="ctrlBtn" onmousedown="pressKey('a')" onmouseup="releaseKey('a')">◀</button>
+    <button class="ctrlBtn" onmousedown="pressKey('s')" onmouseup="releaseKey('s')">▼</button>
+    <button class="ctrlBtn" onmousedown="pressKey('d')" onmouseup="releaseKey('d')">▶</button>
+  </div>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+let players = [
+  {x:100,y:100,size:20,color:'#00FF00',controls:{left:'a',right:'d',up:'w',down:'s'}},
+  {x:200,y:100,size:20,color:'#FF0000',controls:{left:'ArrowLeft',right:'ArrowRight',up:'ArrowUp',down:'ArrowDown'}}
+];
+
+let blocks = [];
+let keys = {};
+let running = false;
+
+function resize(){
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  canvas.style.display='none';
+  document.getElementById('inventory').style.display='none';
+  document.getElementById('topBar').style.display='none';
+}
+
+function startGame(){
+  running=true;
+  canvas.style.display='block';
+  document.getElementById('inventory').style.display='flex';
+  document.getElementById('topBar').style.display='block';
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  resetWorld();
+  gameLoop();
+}
+
+function startMultiplayer(){
+  startGame();
+}
+
+function pauseGame(){
+  running=false;
+  openSettings();
+}
+
+function createNewWorld(){
+  resetWorld();
+  alert('Novo mundo criado!');
+}
+
+function resetWorld(){
+  blocks = [];
+  players[0].x=100; players[0].y=100;
+  players[1].x=200; players[1].y=100;
+}
+
+function goMenu(){ show('menu'); }
+function openWorlds(){ show('worlds'); }
+function openSettings(){ show('settings'); }
+function openSchool(){ show('school'); }
+
+window.addEventListener('keydown', e=> keys[e.key]=true);
+window.addEventListener('keyup', e=> keys[e.key]=false);
+
+function pressKey(k){ keys[k]=true; }
+function releaseKey(k){ keys[k]=false; }
+
+canvas.addEventListener('click', e=>{
+  blocks.push({x:e.clientX, y:e.clientY, size:20});
+});
+
+function update(){
+  players.forEach(p=>{
+    if(keys[p.controls.left]) p.x -= 3;
+    if(keys[p.controls.right]) p.x += 3;
+    if(keys[p.controls.up]) p.y -= 3;
+    if(keys[p.controls.down]) p.y += 3;
+  });
+}
+
+function draw(){
+  ctx.fillStyle = '#87CEEB';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  ctx.fillStyle = '#654321';
+  blocks.forEach(b=> ctx.fillRect(b.x,b.y,b.size,b.size));
+
+  players.forEach(p=>{
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x,p.y,p.size,p.size);
+  });
+}
+
+function gameLoop(){
+  if(!running) return;
+  update();
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+// toggle mobile controls
+const mobileToggle = document.getElementById('mobileToggle');
+mobileToggle.addEventListener('change', ()=>{
+  document.getElementById('mobileControls').style.display = mobileToggle.checked ? 'flex' : 'none';
+});
+</script>
+
+</body>
+</html>
